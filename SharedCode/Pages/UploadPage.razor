@@ -1,0 +1,113 @@
+﻿
+@using SharedCode.Models;
+@using System.ComponentModel.DataAnnotations;
+@using System.Net.Http.Headers;
+
+
+<PageTitle>Upload Photos</PageTitle>
+
+<h4 class="text-center">Upload Photos</h4>
+
+<div class="card mx-auto mb-5 shadow" style="max-width: 400px;">
+    <div class="card-body">
+        <EditForm Model="uploadModel" OnValidSubmit="HandleUpload">
+            <DataAnnotationsValidator />
+
+            <div class="form-group mb-3">
+                <label for="file" class="form-label">Select Files:</label>
+                <InputFile id="file" OnChange="OnFileSelected" multiple class="form-control" />
+                <ValidationMessage For="@(() => uploadModel.File)" />
+            </div>
+
+            <div class="form-group mb-3">
+                <label for="keywords" class="form-label">Keywords:</label>
+                <InputText id="keywords" @bind-Value="uploadModel.Keywords" class="form-control" placeholder="Use , to separate keywords" />
+                <ValidationMessage For="@(() => uploadModel.Keywords)" />
+            </div>
+
+            <div class="form-group mb-3">
+                <label for="filename" class="form-label">Filename:</label>
+                <InputText id="filename" @bind-Value="uploadModel.Filename" class="form-control" placeholder="Name your file" />
+                <ValidationMessage For="@(() => uploadModel.Filename)" />
+            </div>
+
+            <div class="text-center">
+                <button type="submit" class="btn btn-primary" disabled="@(!isFileSelected || isLoading)">Upload</button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(uploadUrl))
+{
+    <p class="text-center">File uploaded successfully!</p>
+}
+
+@if (isLoading)
+{
+    <div class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center bg-light bg-opacity-75">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+
+@code {
+    private UploadModel uploadModel = new UploadModel();
+    private bool isLoading = false;
+    private bool isFileSelected = false;
+    private IBrowserFile selectedFile;
+    private string uploadUrl;
+
+    private CommandsHTTP http = new CommandsHTTP("https://us-central1-bluefilesharing.cloudfunctions.net");
+
+    public class UploadModel
+    {
+        [Required(ErrorMessage = "Please select a file.")]
+        public IBrowserFile File { get; set; }
+
+        [Required(ErrorMessage = "Keywords are required.")]
+        [MinLength(3, ErrorMessage = "Please enter at least 3 characters.")]
+        [MaxLength(40, ErrorMessage = "All keywords must be at most 40 characters.")]
+        public string Keywords { get; set; }
+
+        [Required(ErrorMessage = "Filename is required.")]
+        [MinLength(3, ErrorMessage = "Filename must be at least 3 characters long.")]
+        [MaxLength(40, ErrorMessage = "Filename must be at most 40 characters.")]
+        public string Filename { get; set; }
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+        isFileSelected = true; // Enable the upload button when a file is selected
+        uploadModel.File = selectedFile; // Set the file in the model for validation
+        uploadUrl = string.Empty;
+        uploadModel.Keywords = string.Empty;
+        uploadModel.Filename = string.Empty;
+    }
+
+    private async Task HandleUpload()
+    {
+        if (uploadModel.File == null) return;
+
+        isLoading = true;
+
+        // Prepare the query parameters
+        string uid = UserGlobal.ID;
+
+        // Construct the URL with query parameters
+        string endpoint = $"uploadFile?uid={uid}&keywords={Uri.EscapeDataString(uploadModel.Keywords)}&name={uploadModel.Filename}";
+
+        var content = new MultipartFormDataContent();
+        var streamContent = new StreamContent(selectedFile.OpenReadStream(1024 * 1024 * 15)); // Limit to 15MB
+        streamContent.Headers.ContentType = new MediaTypeHeaderValue(selectedFile.ContentType);
+        content.Add(streamContent, "file", selectedFile.Name);
+
+        string url = await http.FileUpload(endpoint, content);
+
+        Console.WriteLine(url);
+        uploadUrl = url; // Store the upload URL
+        isLoading = false;
+    }
+}

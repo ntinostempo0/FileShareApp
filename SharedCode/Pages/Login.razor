@@ -1,0 +1,190 @@
+﻿
+@inject NavigationManager Navigation
+@using Firebase.Auth;
+@using Firebase.Auth.Providers;
+@using System.ComponentModel.DataAnnotations;
+@using SharedCode.Models;
+@using Newtonsoft.Json;
+
+
+<h4 class="text-center">Login</h4>
+
+<div class="card mx-auto mb-5 shadow" style="max-width: 400px;">
+    <div class="card-body">
+        <EditForm Model="loginModel" OnValidSubmit="HandleLogin">
+            <DataAnnotationsValidator />
+
+            <div class="form-group mb-3">
+                <label for="email" class="form-label">Email:</label>
+                <InputText id="email" @bind-Value="loginModel.Email"  class="form-control" />
+                <ValidationMessage For="@(() => loginModel.Email)" />
+
+            </div>
+            <div class="form-group mb-3">
+                <label for="password" class="form-label">Password:</label>
+                <InputText id="password" type="password" @bind-Value="loginModel.Password" class="form-control" />
+                <ValidationMessage For="@(() => loginModel.Password)" />
+
+            </div>
+            <div class="text-center">
+                <button type="submit" class="btn btn-primary" disabled="@isLoading">Login</button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+<h4 class="text-center">Sign Up</h4>
+
+<div class="card mx-auto shadow" style="max-width: 400px;">
+    <div class="card-body">
+        <EditForm Model="signUpModel" OnValidSubmit="HandleSignUp">
+            <DataAnnotationsValidator />
+
+            <div class="form-group mb-3">
+                <label for="email" class="form-label">Email:</label>
+                <InputText id="email" @bind-Value="signUpModel.Email" class="form-control" />
+                <ValidationMessage For="@(() => signUpModel.Email)" />
+
+            </div>
+            <div class="form-group mb-3">
+                <label for="password" class="form-label">Password:</label>
+                <InputText id="password" type="password" @bind-Value="signUpModel.Password" class="form-control" />
+                <ValidationMessage For="@(() => signUpModel.Password)" />
+
+            </div>
+            <div class="form-group mb-3">
+                <label for="name" class="form-label">Name:</label>
+                <InputText id="name" @bind-Value="signUpModel.displayName" class="form-control" />
+                <ValidationMessage For="@(() => signUpModel.displayName)" />
+
+            </div>
+            <div class="text-center">
+                <button type="submit" class="btn btn-primary" disabled="@isLoading">Sign Up</button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center bg-light bg-opacity-75">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+
+<MessageBox Message="@successMessage" IsVisible="@isModalVisible"/>
+
+@code {
+    protected override void OnInitialized()
+    {
+        //Navigation.NavigateTo("/upload");
+    }
+
+    private LoginModel loginModel = new LoginModel();
+    private SignUpModel signUpModel = new SignUpModel();
+    private bool isLoading = false;
+
+    private string successMessage = string.Empty;
+    private bool isModalVisible = false;
+
+
+    private static FirebaseAuthConfig config = new FirebaseAuthConfig
+    {
+        ApiKey = "Firebase API KEY",
+        AuthDomain = "Firebase AUTH DOMAIN",
+
+        Providers = new FirebaseAuthProvider[]
+        {
+            new EmailProvider()
+        }
+    };
+    private FirebaseAuthClient fireClient = new FirebaseAuthClient(config);
+
+    private CommandsHTTP http = new CommandsHTTP("https://us-central1-bluefilesharing.cloudfunctions.net");
+
+    private async Task HandleSignUp()
+    {
+
+        isLoading = true;
+        successMessage = string.Empty; // Clear any previous messages
+
+        try
+        {
+            string response = await http.createUser(signUpModel.Email, signUpModel.Password, signUpModel.displayName);
+
+            if (response != null)
+            {
+                successMessage = "User created successfully!";
+            }
+            else
+            {
+                successMessage = "User creation failed. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            successMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            isModalVisible = true; // Show the modal
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        isLoading = true;
+        try
+        {
+            var emailUser = await fireClient.SignInWithEmailAndPasswordAsync(loginModel.Email, loginModel.Password);
+
+            var userDetails = await http.GetMethod("/get_User_Details?uid=" + emailUser.User.Uid);
+            UserModel user = JsonConvert.DeserializeObject<UserModel>(userDetails);
+
+            UserGlobal.ID = emailUser.User.Uid;
+            UserGlobal.Email = user.email;
+            UserGlobal.DisplayName = user.display_name;
+            UserGlobal.Files = user.files;
+
+
+            Navigation.NavigateTo("/home");
+        }
+        catch
+        {
+            successMessage = "Login failed. Please try again.";
+            isLoading = false;
+            isModalVisible = true;
+        }
+    }
+
+    public class LoginModel
+    {
+        
+        [Required(ErrorMessage = "Email is required.")]
+        [EmailAddress(ErrorMessage = "Wrong Email.")]
+        public string Email { get; set; }
+
+        [Required(ErrorMessage = "Password is required.")]
+        [DataType(DataType.Password)]
+        public string Password { get; set; }
+    }
+
+    public class SignUpModel
+    {
+        [Required(ErrorMessage = "Email is required.")]
+        [EmailAddress(ErrorMessage = "Wrong Email.")]
+        public string Email { get; set; }
+
+        [Required(ErrorMessage = "Password is required.")]
+        [DataType(DataType.Password)]
+        public string Password { get; set; }
+
+        //[Compare(nameof(SignUpModel.Password))]
+        public string PasswordVal { get; set; }
+
+        public string displayName { get; set; }
+    }
+}

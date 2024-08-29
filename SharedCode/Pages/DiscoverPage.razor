@@ -1,0 +1,112 @@
+﻿
+@using SharedCode.Models;
+@using System.ComponentModel.DataAnnotations;
+@using Newtonsoft.Json;
+
+
+
+
+<PageTitle>Discover Files</PageTitle>
+
+<h1>Discover Files</h1>
+
+<h1 class="mb-4">Search For Documents</h1>
+
+<EditForm Model="filesForm" OnValidSubmit="getFilesHandle">
+    <DataAnnotationsValidator />
+
+    <div class="form-group mb-3">
+        <label for="keywords" class="form-label">Keywords:</label>
+        <InputText id="keywords" @bind-Value="filesForm.Keywords" class="form-control" placeholder="Use , to separate keywords" />
+        <ValidationMessage For="@(() => filesForm.Keywords)" />
+    </div>
+
+
+    <div class="text-center">
+        <button type="submit" class="btn btn-primary" disabled="@(isLoading)">Search</button>
+    </div>
+</EditForm>
+
+<div class="card mx-auto shadow" style="max-width: 600px;">
+    <div class="card-header bg-primary text-white">
+        <h5 class="card-title mb-0">Files</h5>
+    </div>
+    <div class="card-body">
+        @if (allFiles.Count == 0)
+        {
+            <p class="text-center text-muted">No files uploaded yet.</p>
+        }
+        else
+        {
+            <div class="list-group">
+                @foreach (var file in allFiles)
+                {
+                    <a href="@file.url" target="_blank" class="list-group-item list-group-item-action">
+                        @file.name
+                    </a>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+
+@if (isLoading)
+{
+    <div class="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center bg-light bg-opacity-75">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+
+
+
+
+@code {
+    private bool isLoading = false;
+
+    List<SearchedStructure> allFiles = new List<SearchedStructure>();
+    getFilesForm filesForm = new getFilesForm();
+    private CommandsHTTP http = new CommandsHTTP("https://us-central1-bluefilesharing.cloudfunctions.net");
+
+
+    public class getFilesForm
+    {
+
+        [Required(ErrorMessage = "Keywords are required.")]
+        [MaxLength(40, ErrorMessage = "All keywords must be at most 40 characters.")]
+        public string Keywords { get; set; }
+
+    }
+
+    private async Task getFilesHandle()
+    {
+        isLoading = true;
+
+        allFiles.Clear();
+
+
+        try
+        {
+            Console.WriteLine(filesForm.Keywords);
+            string fileString = await http.GetMethod("/getFilesByKeys?keys="+filesForm.Keywords);
+
+            Console.WriteLine(fileString);
+
+            allFiles = JsonConvert.DeserializeObject<List<SearchedStructure>>(fileString);
+
+            StateHasChanged();
+
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching file: {ex.Message}");
+        }
+
+
+
+
+        isLoading = false;
+    }
+}

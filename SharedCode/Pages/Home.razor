@@ -1,0 +1,59 @@
+﻿
+@using SharedCode.Models;
+@using Newtonsoft.Json;
+
+<PageTitle>Home</PageTitle>
+
+<h1 class="mb-4">Welcome, @UserGlobal.DisplayName</h1>
+
+<div class="card mx-auto shadow" style="max-width: 600px;">
+    <div class="card-header bg-primary text-white">
+        <h5 class="card-title mb-0">My Files</h5>
+    </div>
+    <div class="card-body">
+        @if (UserFilesGlobal.Name.Count == 0)
+        {
+            <p class="text-center text-muted">No files uploaded yet.</p>
+        }
+        else
+        {
+            <div class="list-group">
+                @foreach (var name in UserFilesGlobal.Name)
+                {
+                    <a href="@UserFilesGlobal.URL[UserFilesGlobal.Name.IndexOf(name)]" target="_blank" class="list-group-item list-group-item-action">
+                        @name
+                    </a>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private CommandsHTTP http = new CommandsHTTP("https://us-central1-bluefilesharing.cloudfunctions.net");
+
+    protected override async Task OnInitializedAsync()
+    {
+        UserFilesGlobal.Name.Clear();
+        UserFilesGlobal.URL.Clear();
+        UserFilesGlobal.ID.Clear();
+
+        foreach (var fileId in UserGlobal.Files)
+        {
+            try
+            {
+                string fileString = await http.getFile("getFile", fileId);
+
+                FileStructure file = JsonConvert.DeserializeObject<FileStructure>(fileString);
+
+                UserFilesGlobal.Name.Add(file.name);
+                UserFilesGlobal.URL.Add(file.url);
+                UserFilesGlobal.ID.Add(file.id);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching file {fileId}: {ex.Message}");
+            }
+        }
+    }
+}

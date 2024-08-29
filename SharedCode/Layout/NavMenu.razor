@@ -1,0 +1,62 @@
+﻿<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid d-flex align-items-center">
+        <!-- Hamburger icon for toggling menu visibility -->
+        <span class="oi oi-menu" style="color:white; font-size: 1.5rem;" @onclick="ToggleIconMenu" aria-hidden="true"></span>
+
+        @if (!IconMenuActive)
+        {
+            <a class="navbar-brand" href="home">Share Files</a>
+        }
+
+    </div>
+</div>
+
+<div class="@NavMenuCssClass">
+    <nav class="flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="home" Match="NavLinkMatch.All">
+                <span class="oi oi-home" aria-hidden="true"></span>
+                @if (!IconMenuActive)
+                {
+                    <label>Home</label>
+                }
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="upload">
+                <span class="oi oi-plus" aria-hidden="true"></span>
+                @if (!IconMenuActive)
+                {
+                    <label>Upload</label>
+                }
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="discover">
+                <span class="oi oi-list-rich" aria-hidden="true"></span>
+                @if (!IconMenuActive)
+                {
+                    <label>Discover</label>
+                }
+            </NavLink>
+        </div>
+    </nav>
+</div>
+
+
+@code {
+    private bool IconMenuActive { get; set; } = false;
+
+    [Parameter]
+    public EventCallback<bool> ShowIconMenu { get; set; }
+
+    private bool collapseNavMenu = true;
+
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : "expand";
+
+    private async Task ToggleIconMenu()
+    {
+        IconMenuActive = !IconMenuActive;
+        await ShowIconMenu.InvokeAsync(IconMenuActive);
+    }
+}
